@@ -186,7 +186,11 @@ var runTests = function(namespace) {
 			let outer = testSuites;
 			let inner = new testSuite(subNamespace);
 			testSuites = inner.cases;
+			testSuites.countTestsOverall = 0;
+			testSuites.countTestsFailed = 0;
 			runTests(namespace[subNamespace]);
+			inner.countTestsOverall = inner.cases.countTestsOverall;
+			inner.countTestsFailed = inner.cases.countTestsFailed;
 			outer.push(inner);
 			testSuites = outer;
 		}

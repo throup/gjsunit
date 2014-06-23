@@ -199,7 +199,7 @@ function testSuite() {
 		});
 	});
 
-	describe('expect::toBeCloseTo', function() {
+	describe('expect::toThrow', function() {
 		function throwException() {	throw {}; }
 		function dontThrowException() {}
 

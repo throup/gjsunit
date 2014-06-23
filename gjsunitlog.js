@@ -9,7 +9,7 @@ var countTestsOverall = 0;
 var countTestsFailed = 0;
 
 window.describe = function(moduleName, callback) {
-	logfile += '<testsuite name="' + moduleName + '">\n';
+	logfile += '<testsuite name="' + moduleName + '" tests="' + countTestsOverall + '">\n';
 	callback();
 	logfile += '</testsuite>\n';
 };

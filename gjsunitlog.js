@@ -5,24 +5,62 @@ imports.searchPath.push('.');
 imports.searchPath.push('/usr/share/gnome-js');
 imports.searchPath.push('/usr/share/gnome-shell/js');
 
-var countTestsOverall = 0;
-var countTestsFailed = 0;
+var testSuites = [];
+
+function testSuite(name) {
+	this.name = name;
+	this.cases = [];
+	this.countTestsOverall = 0;
+	this.countTestsFailed = 0;
+}
+testSuite.prototype.log = function() {
+	let output = '<testsuite name="'+this.name+'" tests="'+this.countTestsOverall+'" failures="'+this.countTestsFailed+'">';
+	for (let i in this.cases) {
+		let tc = this.cases[i];
+		if (tc.log) {
+			output += tc.log();
+		}
+	}
+	output += '</testsuite>';
+	return output;
+}
+
+function testCase(name) {
+	this.name = name;
+	this.error = '';
+}
+testCase.prototype.log = function() {
+	let output = '<testcase name="'+this.name+'"';
+	if (!this.error) {
+		output += '/>';
+	} else {
+		output += '><failure message="'+this.error+'"/></testcase>';
+	}
+	return output;
+}
+testCase.prototype.fail = function(message) {
+	this.error = message;
+}
 
 window.describe = function(moduleName, callback) {
-	logfile += '<testsuite name="' + moduleName + '" tests="' + countTestsOverall + '">\n';
+	var inner = new testSuite(moduleName);
+	testSuites.push(inner);
 	callback();
-	logfile += '</testsuite>\n';
+	testSuites.countTestsOverall += inner.countTestsOverall;
+	testSuites.countTestsFailed  += inner.countTestsFailed;
 };
 
 window.it = function(expectation, callback) {
-	logfile += '<testcase name="' + expectation + '">\n';
+	let test = new testCase(expectation);
 	try {
 		callback();
 	}
 	catch(e) {
-		logfile += '<failure/>';
+		test.fail(e.message);
 	}
-	logfile += '</testcase>\n';
+	let testSuite = testSuites.pop();
+	testSuite.cases.push(test);
+	testSuites.push(testSuite);
 }
 
 window.expect = function(actualValue) {
@@ -31,7 +69,6 @@ window.expect = function(actualValue) {
 		function triggerResult(success, msg) {
 			if( (success && !positive) ||
 				(!success && positive) ) {
-				++countTestsFailed;
 				throw new Error(msg);
 			}
 		}
@@ -126,7 +163,9 @@ window.expect = function(actualValue) {
 		};
 	}
 
-	++countTestsOverall;
+	let testSuite = testSuites.pop();
+	++testSuite.countTestsOverall;
+	testSuites.push(testSuite);
 
 	var expecter = new MatcherFactory(actualValue, true);
 	expecter.not = new MatcherFactory(actualValue, false);
@@ -144,9 +183,12 @@ var runTests = function(namespace) {
 		}
 		// descend into subfolders and objects
 		else if( typeof namespace[subNamespace] === 'object' ) {
-			logfile += '<testsuite name="' + subNamespace + '">\n';
+			let outer = testSuites;
+			let inner = new testSuite(subNamespace);
+			testSuites = inner.cases;
 			runTests(namespace[subNamespace]);
-			logfile += '</testsuite>\n';
+			outer.push(inner);
+			testSuites = outer;
 		}
 	}
 }
@@ -166,15 +208,16 @@ if( ARGV[0] && knownDirs.indexOf(ARGV[0]) !== -1 ) {
 }
 
 
-var logfile = '';
-
-logfile += '<?xml version="1.0"?>\n';
-logfile += '<testsuites>\n';
-
 // run tests from the test root
 runTests(imports[testDir]);
 
-logfile += '</testsuites>\n';
+
+let logfile = '<?xml version="1.0"?>\n';
+logfile += '<testsuites>';
+for (let i in testSuites) {
+	logfile += testSuites[i].log();
+}
+logfile += '</testsuites>';
 
 
 print(logfile);

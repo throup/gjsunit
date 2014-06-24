@@ -7,51 +7,65 @@ imports.searchPath.push('/usr/share/gnome-shell/js');
 
 var testSuites = [];
 
-function testSuite(name) {
-	this.name = name;
-	this.cases = [];
-	this.countTestsOverall = 0;
-	this.countTestsFailed = 0;
+function Testsuite(name) {
+	this._init(name);
 }
-testSuite.prototype.log = function() {
-	let output = '<testsuite name="'+this.name+'" tests="'+this.countTestsOverall+'" failures="'+this.countTestsFailed+'">';
-	for (let i in this.cases) {
-		let tc = this.cases[i];
-		if (tc.log) {
-			output += tc.log();
+Testsuite.prototype = {
+	_init: function(name) {
+		this.name = name;
+		this.cases = [];
+		this.countTestsOverall = 0;
+		this.countTestsFailed = 0;
+	},
+
+	log: function() {
+		let output = '<testsuite name="' + this.name + '" tests="' + this.countTestsOverall + '" failures="' + this.countTestsFailed + '">';
+		for( let i in this.cases ) {
+			let tc = this.cases[i];
+			if( tc.log ) {
+				output += tc.log();
+			}
 		}
+		output += '</testsuite>';
+		return output;
 	}
-	output += '</testsuite>';
-	return output;
 }
 
-function testCase(name) {
-	this.name = name;
-	this.error = '';
+function Testcase(name) {
+	this._init(name);
 }
-testCase.prototype.log = function() {
-	let output = '<testcase name="'+this.name+'"';
-	if (!this.error) {
-		output += '/>';
-	} else {
-		output += '><failure message="'+this.error+'"/></testcase>';
+
+Testcase.prototype = {
+	_init: function(name) {
+		this.name = name;
+		this.error = '';
+	},
+
+	log: function() {
+		let output = '<testcase name="' + this.name + '"';
+		if( !this.error ) {
+			output += '/>';
+		} else {
+			output += '><failure message="' + this.error + '"/></testcase>';
+		}
+		return output;
+	},
+
+	fail: function(message) {
+		this.error = message;
 	}
-	return output;
-}
-testCase.prototype.fail = function(message) {
-	this.error = message;
 }
 
 window.describe = function(moduleName, callback) {
-	var inner = new testSuite(moduleName);
+	var inner = new Testsuite(moduleName);
 	testSuites.push(inner);
 	callback();
 	testSuites.countTestsOverall += inner.countTestsOverall;
-	testSuites.countTestsFailed  += inner.countTestsFailed;
+	testSuites.countTestsFailed += inner.countTestsFailed;
 };
 
 window.it = function(expectation, callback) {
-	let test = new testCase(expectation);
+	let test = new Testcase(expectation);
 	try {
 		callback();
 	}
@@ -184,7 +198,7 @@ var runTests = function(namespace) {
 		// descend into subfolders and objects
 		else if( typeof namespace[subNamespace] === 'object' ) {
 			let outer = testSuites;
-			let inner = new testSuite(subNamespace);
+			let inner = new Testsuite(subNamespace);
 			testSuites = inner.cases;
 			testSuites.countTestsOverall = 0;
 			testSuites.countTestsFailed = 0;
@@ -218,7 +232,7 @@ runTests(imports[testDir]);
 
 let logfile = '<?xml version="1.0"?>\n';
 logfile += '<testsuites>';
-for (let i in testSuites) {
+for( let i in testSuites ) {
 	logfile += testSuites[i].log();
 }
 logfile += '</testsuites>';

@@ -11,19 +11,90 @@ const TP_ANSI_FG_GREEN   = ESC + "[32m";
 const TP_ANSI_FG_DEFAULT = ESC + "[39m";
 const TP_ANSI_FG_GREY    = ESC + "[90m";
 
-function TestRunner() {
+var Subject = function(name) {
+    "use strict";
+    this.name = name;
+    this.facets = [];
+};
+Subject.prototype = {
+    addFacet: function(name) {
+        "use strict";
+        this.currentFacet = new Facet(name);
+        this.facets.push(this.currentFacet);
+    },
+
+    pass: function(expectation) {
+        "use strict";
+        this.currentFacet.pass(expectation);
+    },
+
+    fail: function(expectation, reason) {
+        "use strict";
+        this.currentFacet.fail(expectation, reason);
+    }
+};
+
+var Expectation = function(label) {
+    "use strict";
+    this.label = label;
+    this.state = 0;
+    this.failure = '';
+}
+Expectation.PASS = 1;
+Expectation.FAIL = -1;
+Expectation.prototype = {
+    pass: function() {
+        this.state = Expectation.PASS;
+    },
+
+    fail: function(reason) {
+        "use strict";
+        this.state = Expectation.FAIL;
+        this.failure = reason;
+    }
+};
+
+var Facet = function(name) {
+    "use strict";
+    this.name = name;
+    this.expectations = [];
+};
+Facet.prototype = {
+    pass: function(label) {
+        "use strict";
+        let expectation = new Expectation(label);
+        expectation.pass();
+        this.expectations.push(expectation);
+    },
+
+    fail: function(label, reason) {
+        "use strict";
+        let expectation = new Expectation(label);
+        expectation.fail(reason);
+        this.expectations.push(expectation);
+    }
+};
+
+var TestRunner = function() {
     "use strict";
     this.countTestsOverall = 0;
     this.countTestsFailed  = 0;
-}
+    this.subjects = [];
+};
 TestRunner.prototype = {
+    addSubject: function (moduleName) {
+        this.currentSubject = new Subject(moduleName);
+        this.subjects.push(this.currentSubject);
+    },
+
     describe: function (moduleName, callback) {
         "use strict";
-        print('\n' + moduleName);
+        this.addSubject(moduleName);
         callback();
     },
 
     it: function (expectation, callback) {
+        this.currentSubject.addFacet(expectation);
         try {
             callback();
             this.testPass(expectation);
@@ -141,16 +212,15 @@ TestRunner.prototype = {
     },
 
     testPass: function (expectation) {
-        print('  ' + TP_ANSI_FG_GREEN + '✔' + TP_ANSI_FG_DEFAULT + ' ' + TP_ANSI_FG_GREY + expectation + TP_ANSI_FG_DEFAULT);
+        this.currentSubject.pass(expectation);
     },
 
     testFail: function (expectation, error) {
+        this.currentSubject.fail(expectation, error);
         ++this.countTestsFailed;
-        print('  ' + TP_ANSI_FG_RED + '❌' + TP_ANSI_FG_DEFAULT + ' ' + TP_ANSI_FG_GREY + expectation + TP_ANSI_FG_DEFAULT);
-        print(TP_ANSI_FG_RED + error.message + TP_ANSI_FG_DEFAULT);
     }
 
-}
+};
 
 let runner = new TestRunner();
 
@@ -160,11 +230,11 @@ window.describe = function(moduleName, callback) {
 
 window.it = function(expectation, callback) {
 	return runner.it(expectation, callback);
-}
+};
 
 window.expect = function(actualValue) {
     return runner.expect(actualValue);
-}
+};
 
 var runTests = function(namespace) {
 	// recursively check the test directory for executable tests
@@ -179,7 +249,7 @@ var runTests = function(namespace) {
 			runTests(namespace[subNamespace]);
 		}
 	}
-}
+};
 
 // by default we run tests from the 'test' directory
 var testDir = 'test';
@@ -198,25 +268,58 @@ if( ARGV[0] && knownDirs.indexOf(ARGV[0]) !== -1 ) {
 // run tests from the test root
 runTests(imports[testDir]);
 
-function ConsoleReporter(framework) {
+var ConsoleReporter = function(framework) {
     "use strict";
-    this.framework = framework;
-}
+    this.runner = framework;
+};
 ConsoleReporter.prototype = {
     report: function() {
         "use strict";
-        if( this.framework.countTestsFailed ) {
+
+        for (let i in this.runner.subjects) {
+            let subject = runner.subjects[i];
+            print('\n' + subject.name);
+            for (let j in subject.facets) {
+                let facet = subject.facets[j];
+                for (let k in facet.expectations) {
+                    let expectation = facet.expectations[k];
+                    if (expectation.state == Expectation.PASS) {
+                        print(this.greenText(' ✔ ') + this.greyText(expectation.label));
+                    } else if (expectation.state == Expectation.FAIL) {
+                        print(this.redText(' ❌ ') + this.greyText(expectation.label));
+                        print(this.redText(expectation.failure));
+                    }
+                }
+            }
+        }
+
+        if( this.runner.countTestsFailed ) {
             // some tests failed
-            print('\n' + TP_ANSI_FG_RED + '❌ ' + this.framework.countTestsFailed + ' of ' + this.framework.countTestsOverall + ' tests failed' + TP_ANSI_FG_DEFAULT);
+            print('\n' + this.redText('❌ ' + this.runner.countTestsFailed + ' of ' + this.runner.countTestsOverall + ' tests failed'));
         }
         else {
             // all tests okay
-            print('\n' + TP_ANSI_FG_GREEN + '✔ ' + this.framework.countTestsOverall + ' completed' + TP_ANSI_FG_DEFAULT);
+            print('\n' + this.greenText('✔ ' + this.runner.countTestsOverall + ' completed'));
         }
 
         print();
+    },
+
+    greyText: function(text) {
+        "use strict";
+        return TP_ANSI_FG_GREY + text + TP_ANSI_FG_DEFAULT;
+    },
+
+    greenText: function(text) {
+        "use strict";
+        return TP_ANSI_FG_GREEN + text + TP_ANSI_FG_DEFAULT;
+    },
+
+    redText: function(text) {
+        "use strict";
+        return TP_ANSI_FG_RED + text + TP_ANSI_FG_DEFAULT;
     }
-}
+};
 
 var reporter = new ConsoleReporter(runner);
 reporter.report();

@@ -39,7 +39,7 @@ function testSuite() {
 		var obj2 = {};
 
 		it('should compare using ==', function() {
-			expect(true).not.toEqual(true);
+			expect(true).toEqual(true);
 			expect(true).toEqual(1);
 			expect(false).toEqual(false);
 			expect(false).toEqual(0);

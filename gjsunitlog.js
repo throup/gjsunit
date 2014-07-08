@@ -321,6 +321,59 @@ if( ARGV[0] && knownDirs.indexOf(ARGV[0]) !== -1 ) {
 // run tests from the test root
 runTests(imports[testDir]);
 
+var ConsoleReporter = function(framework) {
+    "use strict";
+    this.runner = framework;
+};
+ConsoleReporter.prototype = {
+    report: function() {
+        "use strict";
+
+        for (let i in this.runner.subjects) {
+            let subject = runner.subjects[i];
+            print('\n' + subject.name);
+            for (let j in subject.facets) {
+                let facet = subject.facets[j];
+                for (let k in facet.expectations) {
+                    let expectation = facet.expectations[k];
+                    if (expectation.state == Expectation.PASS) {
+                        print(this.greenText(' ✔ ') + this.greyText(expectation.label));
+                    } else if (expectation.state == Expectation.FAIL) {
+                        print(this.redText(' ❌ ') + this.greyText(expectation.label));
+                        print(this.redText(expectation.failure));
+                    }
+                }
+            }
+        }
+
+        if( this.runner.countTestsFailed ) {
+            // some tests failed
+            print('\n' + this.redText('❌ ' + this.runner.countTestsFailed + ' of ' + this.runner.countTestsOverall + ' tests failed'));
+        }
+        else {
+            // all tests okay
+            print('\n' + this.greenText('✔ ' + this.runner.countTestsOverall + ' completed'));
+        }
+
+        print();
+    },
+
+    greyText: function(text) {
+        "use strict";
+        return TP_ANSI_FG_GREY + text + TP_ANSI_FG_DEFAULT;
+    },
+
+    greenText: function(text) {
+        "use strict";
+        return TP_ANSI_FG_GREEN + text + TP_ANSI_FG_DEFAULT;
+    },
+
+    redText: function(text) {
+        "use strict";
+        return TP_ANSI_FG_RED + text + TP_ANSI_FG_DEFAULT;
+    }
+};
+
 var XmlReporter = function(framework) {
     "use strict";
     this.runner = framework;

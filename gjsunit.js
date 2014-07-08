@@ -31,6 +31,34 @@ Subject.prototype = {
     fail: function(expectation, reason) {
         "use strict";
         this.currentFacet.fail(expectation, reason);
+    },
+
+    incrementExpectations: function() {
+        "use strict";
+        this.currentFacet.incrementExpectations();
+    },
+
+    numberTests: function() {
+        "use strict";
+        return this.facets.length;
+    },
+
+    numberExpectations: function() {
+        "use strict";
+        let count = 0;
+        for (let i in this.facets) {
+            count += this.facets[i].numberExpectations();
+        }
+        return count;
+    },
+
+    numberFailures: function() {
+        "use strict";
+        let count = 0;
+        for (let i in this.facets) {
+            count += this.facets[i].numberFailures();
+        }
+        return count;
     }
 };
 
@@ -58,6 +86,7 @@ var Facet = function(name) {
     "use strict";
     this.name = name;
     this.expectations = [];
+    this.count = 0;
 };
 Facet.prototype = {
     pass: function(label) {
@@ -72,6 +101,25 @@ Facet.prototype = {
         let expectation = new Expectation(label);
         expectation.fail(reason);
         this.expectations.push(expectation);
+    },
+
+    incrementExpectations: function() {
+        "use strict";
+        ++this.count;
+    },
+
+    numberExpectations: function() {
+        "use strict";
+        return this.count;
+    },
+
+    numberFailures: function() {
+        "use strict";
+        let count = 0;
+        for (let i in this.expectations) {
+            count += (this.expectations[i].state == Expectation.FAIL);
+        }
+        return count;
     }
 };
 
@@ -93,8 +141,12 @@ TestRunner.prototype = {
         callback();
     },
 
-    it: function (expectation, callback) {
+    addFacet: function (expectation) {
         this.currentSubject.addFacet(expectation);
+    },
+
+    it: function (expectation, callback) {
+        this.addFacet(expectation);
         try {
             callback();
             this.testPass(expectation);
@@ -208,6 +260,7 @@ TestRunner.prototype = {
         var expecter = new MatcherFactory(actualValue, true);
         expecter.not = new MatcherFactory(actualValue, false);
 
+        this.currentSubject.incrementExpectations();
         return expecter;
     },
 
@@ -303,6 +356,60 @@ ConsoleReporter.prototype = {
         }
 
         print();
+    },
+
+    greyText: function(text) {
+        "use strict";
+        return TP_ANSI_FG_GREY + text + TP_ANSI_FG_DEFAULT;
+    },
+
+    greenText: function(text) {
+        "use strict";
+        return TP_ANSI_FG_GREEN + text + TP_ANSI_FG_DEFAULT;
+    },
+
+    redText: function(text) {
+        "use strict";
+        return TP_ANSI_FG_RED + text + TP_ANSI_FG_DEFAULT;
+    }
+};
+
+var XmlReporter = function(framework) {
+    "use strict";
+    this.runner = framework;
+};
+XmlReporter.prototype = {
+    report: function() {
+        "use strict";
+
+        let output = '<?xml version="1.0"?>\n';
+        output += '<testsuites>';
+        for (let i in this.runner.subjects) {
+            let subject = runner.subjects[i];
+            output += '<testsuite name="' + subject.name + '" tests="' + subject.numberTests() + '" assertions="' + subject.numberExpectations() + '" failures="' + subject.numberFailures() + '">';
+            for (let j in subject.facets) {
+                let facet = subject.facets[j];
+                output += '<testcase name="' + facet.name + '" assertions="' + facet.numberExpectations() + '"';
+                if (facet.numberFailures() > 0) {
+                    output += '>';
+                    for (let k in facet.expectations) {
+                        let expectation = facet.expectations[k];
+                        if (expectation.state == Expectation.FAIL) {
+                            output += '<failure>';
+                            output += expectation.failure;
+                            output += '</failure>';
+                        }
+                    }
+                    output += '</testcase>';
+                } else {
+                    output += '/>';
+                }
+            }
+            output += '</testsuite>';
+        }
+        output += '</testsuites>';
+
+        print(output);
     },
 
     greyText: function(text) {
